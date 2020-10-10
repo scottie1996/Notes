@@ -34,7 +34,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
 
 <div align="center"> <img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/1492928416812_4.png"/> </div><br>
 
-<img src="C:\Users\zhouz\AppData\Roaming\Typora\typora-user-images\image-20200914222444012.png" alt="image-20200914222444012" style="zoom:50%;" />
+<img src="https://raw.githubusercontent.com/scottie1996/PicGo/master/img/image-20201010172305270.png" alt="image-20201010172305270" style="zoom:67%;" />
 
 
 
