@@ -381,16 +381,41 @@ public int await( long timeout, TimeUnit unit) throws InterruptedException,Broke
     
         队列大小没有限制
     
-        ![image-20201029172710520](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/image-20201029172710520.png)
+        <img src="https://raw.githubusercontent.com/scottie1996/PicGo/master/img/image-20201029172710520.png" alt="image-20201029172710520" style="zoom: 33%;" />
     
     2. newSingleThreadExecutor
     
+        一个单线程池，池中只有一个线程在工作，串行执行所有任务。保证任务执行顺序按照任务的提交顺序执行。
+    
+        这个线程因为异常结束，会有一个新的线程来代替它。
+    
+        ![image-20201029173505702](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/image-20201029173505702.png)
+    
+        
+    
     3. newCachedThreadPool
+    
+        可根据需要创建新线程，线程数没有限制。
+    
+        如果以前创建的线程可用，那么先会重用以前的线程；如果没有可用的，则会创建新的线程添加入池。
+    
+        线程池中已有60秒钟未被使用的线程将被终止和移除。
+    
+        队列拿到任务就给线程池加线程。
+    
+        ![image-20201029173555326](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/image-20201029173555326.png)
     
     4. newSingleThreadScheduledExecutor
     
+        
+    
     5. newScheduledThreadPool 
-        - FixedRate是从上一个任务开始后计时，[ScheduledExecutorServiceDemo](https://github.com/guanpengchn/java-concurrent-programming/blob/master/src/main/java/ch3/s2/ScheduledExecutorServiceDemo.java)
+    
+        创建一个大小无限的线程池，支持定时以及周期性执行任务的需求。
+    
+        ![image-20201029173640963](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/image-20201029173640963.png)
+    
+    6. - FixedRate是从上一个任务开始后计时，[ScheduledExecutorServiceDemo](https://github.com/guanpengchn/java-concurrent-programming/blob/master/src/main/java/ch3/s2/ScheduledExecutorServiceDemo.java)
         - FixedDelay是从上一个任务结束后计时
 
 #### 3.2.3　刨根究底：核心线程池的内部实现	102
@@ -408,6 +433,50 @@ public ThreadPoolExecutor(int corePoolSize,
          Executors.defaultThreadFactory(), handler);
 }
 ```
+
+1. **int corePoolSize**
+
+> 线程池的核心线程数最大值。
+>
+> 一般无论是否有任务核心线程会在池中一直存活。
+>
+> ThreadPoolExecutor 中的方法 allowCoreThreadTimeOut(boolean value) 设置为 true 时，闲置的核心线程会存在超时机制，如果在指定时间没有新任务来时，核心线程也会被终止。
+>
+> 这个指定时间由后面的keepAliveTime指定。
+
+**核心线程：**
+
+**线程池新建线程时，如果当前线程数小于*corePoolSize**，则新建的是核心线程，如果超过**corePoolSize**，则新建的是非核心线程。
+
+2. **int maximumPoolSize**
+
+池中能容纳的最大线程数，达到该值后的后续任务被阻塞。
+
+**线程数**=核心线程数+非核心线程数
+
+3. **Long keepAliveTime**
+
+非核心线程闲置时的超时时长。
+
+但如果allowCoreThreadTimeOut(boolean value) 设置为 true 时，也作用于核心线程。
+
+4. **TimeUnit unit**
+
+指定keepAliveTime的时间单位，TimeUnit是enum枚举类型，常用的有：TimeUnit.HOURS(小时)、TimeUnit.MINUTES(分钟)、TimeUnit.SECONDS(秒) 和 TimeUnit.MILLISECONDS(毫秒)等。
+
+5. **BlockingQueue<Runnable> workQueue**
+
+线程池的任务队列，维护着等待执行的Runnable对象。
+
+通过线程池的 execute(Runnable command) 方法会将任务 Runnable 存储在队列中。
+
+6. **ThreadFactory threadFactory**
+
+线程工厂，它是一个接口，用来为线程池创建新线程的。
+
+7. **RejectedExecutionHandler handler**
+
+抛出异常专用
 
 workQueue和handler需要特别理解一下，核心执行代码如下：
 
@@ -432,6 +501,36 @@ public void execute(Runnable command) {
         reject(command);
 }
 ```
+
+> **线程池的执行策略：**
+>
+> **线程池中线程数量没有达到核心线程数，就新建一个核心线程执行任务；**
+>
+> **线程池中核心线程数已满，就在任务队列中排队；**
+>
+> **任务队列中已满时，就新建非核心线程执行任务；**
+>
+> **当线程数量达到最大线程数时会抛出异常。**
+
+#### 常用的workQueue类型：
+
+**1、SynchronousQueue：**这个队列接收到任务的时候，会直接提交给线程处理，而不保留它，如果所有线程都在工作怎么办？那就新建一个线程来处理这个任务！所以**为了保证不出现<线程数达到了maximumPoolSize而不能新建线程>的错误**，使用这个类型队列的时候，maximumPoolSize一般指定成Integer.MAX_VALUE，即无限大
+
+**策略：不在队列中等，而是在线程池中新建线程。**
+
+**2、LinkedBlockingQueue：**这个队列接收到任务的时候，如果当前线程数小于核心线程数，则新建线程(核心线程)处理任务；**如果当前线程数等于核心线程数，则进入队列等待**。由于这个队列没有最大值限制，即所有超过核心线程数的任务都将被添加到队列中，这也就**导致了maximumPoolSize的设定失效**，因为总线程数永远不会超过corePoolSize
+
+**策略：线程数少于核心线程数，那就创建核心线程；线程数等于核心线程数，入队等待，队列无限。**
+
+**3、ArrayBlockingQueue：**可以限定队列的长度，接收到任务的时候，如果没有达到corePoolSize的值，则新建线程(核心线程)执行任务，如果达到了，则入队等候，如果队列已满，则新建线程(非核心线程)执行任务，又如果总线程数到了maximumPoolSize，并且队列也满了，则发生错误
+
+**策略：线程数少于核心线程数，那就创建核心线程；线程数等于核心线程数，入队等待，队列满就在线程池中创建非核心线程**
+
+**4、DelayQueue：**队列内元素必须实现Delayed接口，这就意味着你传进去的任务必须先实现Delayed接口。这个队列接收到任务时，首先先入队，只有达到了指定的延时时间，才会执行任务
+
+**策略：所有任务必须延时执行。**
+
+
 
 #### 3.2.4　超负载了怎么办：拒绝策略	106
 
