@@ -359,19 +359,37 @@ public int await( long timeout, TimeUnit unit) throws InterruptedException,Broke
 ### 3.2　线程复用：线程池	95
 
 #### 3.2.1　什么是线程池	96
+
+1. 使用线程池的目的∶避免线程的创建和销毁带来的性能开销。
+2. 免大量线程间因互相抢占系统资源导致的阻塞现象。
+3. 能对线程进行简单管理，提供定时执行、间隔执行的功能。
+
+
+
 #### 3.2.2　不要重复发明轮子：JDK对线程池的支持	97
 
 - 类图要好好看看，建议阅读jdk源代码了解下关系，整理如下：
-    - ExecutorService继承了Executor
+    - ExecutorService继承了线程池顶级接口Executor
     - AbstractExecutorService实现了ExecutorService接口
-    - Executors生成了ThreadPoolExecutor
+    - Executors生成了实现类ThreadPoolExecutor
     
 - Executors中包含的一部分线程池类型：
-    - newFixedThreadPool，[ThreadPoolDemo](https://github.com/guanpengchn/java-concurrent-programming/blob/master/src/main/java/ch3/s2/ThreadPoolDemo.java)
-    - newSingleThreadExecutor
-    - newCachedThreadPool
-    - newSingleThreadScheduledExecutor
-    - newScheduledThreadPool 
+    1. newFixedThreadPool
+    
+        固定大小的线程池，每次提交一个任务就创建一个线程，直到线程达到线程池的最大大小，线程池的大小一旦达到最大值就会保持不变。
+        如果某个线程因为执行异常而结束，那么线程池会补充一个新线程。可以控制线程最大并发量（核心线程数等于最大线程数）
+    
+        队列大小没有限制
+    
+        ![image-20201029172710520](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/image-20201029172710520.png)
+    
+    2. newSingleThreadExecutor
+    
+    3. newCachedThreadPool
+    
+    4. newSingleThreadScheduledExecutor
+    
+    5. newScheduledThreadPool 
         - FixedRate是从上一个任务开始后计时，[ScheduledExecutorServiceDemo](https://github.com/guanpengchn/java-concurrent-programming/blob/master/src/main/java/ch3/s2/ScheduledExecutorServiceDemo.java)
         - FixedDelay是从上一个任务结束后计时
 
