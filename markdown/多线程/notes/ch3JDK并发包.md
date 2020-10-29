@@ -369,9 +369,9 @@ public int await( long timeout, TimeUnit unit) throws InterruptedException,Broke
 #### 3.2.2　不要重复发明轮子：JDK对线程池的支持	97
 
 - 类图要好好看看，建议阅读jdk源代码了解下关系，整理如下：
-    - ExecutorService继承了线程池顶级接口Executor
-    - AbstractExecutorService实现了ExecutorService接口
-    - Executors生成了实现类ThreadPoolExecutor
+    - `ExecutorService`继承了线程池顶级接口`Executor`
+    - `AbstractExecutorService`实现了`ExecutorService`接口
+    - `Executors`生成了实现类`ThreadPoolExecutor`
     
 - Executors中包含的一部分线程池类型：
     1. newFixedThreadPool
@@ -462,7 +462,7 @@ public ThreadPoolExecutor(int corePoolSize,
 
 4. **TimeUnit unit**
 
-指定keepAliveTime的时间单位，TimeUnit是enum枚举类型，常用的有：TimeUnit.HOURS(小时)、TimeUnit.MINUTES(分钟)、TimeUnit.SECONDS(秒) 和 TimeUnit.MILLISECONDS(毫秒)等。
+指定`keepAliveTime`的时间单位，`TimeUnit是enum枚举类型`，常用的有：TimeUnit.HOURS(小时)、TimeUnit.MINUTES(分钟)、TimeUnit.SECONDS(秒) 和 TimeUnit.MILLISECONDS(毫秒)等。
 
 5. **BlockingQueue<Runnable> workQueue**
 
