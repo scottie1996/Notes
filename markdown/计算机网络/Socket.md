@@ -2,15 +2,22 @@
 
 
 
-
 # 一、I/O 模型
+
+![图片](https://mmbiz.qpic.cn/mmbiz_png/Dy9FI3qyk8icqzXTSNUeLIbHJ1qaoflp4qXJNr7hAyicaGkzvyerI1kzt7WTEnpNa8ficNG8Lv11pUmsJuuoqxchg/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
+
+抽象数据流(I/O流)的概念：**指一组有顺序的、有起点和终点的字节集合**，抽象出数据流的作用：**实现程序逻辑与底层硬件解耦**，通过引入数据流作为程序与硬件设备之间的抽象层，面向通用的数据流输入输出接口编程，而不是具体硬件特性，程序和底层硬件可以独立灵活替换和扩展
+
+![图片](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/640-20201227184601974)
 
 一个输入操作通常包括两个阶段：
 
 - 等待数据准备好
 - 从内核向进程复制数据
 
-对于一个套接字上的输入操作，第一步通常涉及等待数据从网络中到达。当所等待数据到达时，它被复制到内核中的某个缓冲区。第二步就是把数据从内核缓冲区复制到应用进程缓冲区。
+针对网络IO来说，对于一个socket上的输入操作，第一步通常涉及等待数据从网络中到达。当所等待数据到达时，它被复制到内核中的某个缓冲区。第二步就是把数据从内核缓冲区复制到应用进程缓冲区。
+
+![图片](https://mmbiz.qpic.cn/mmbiz_png/Dy9FI3qyk8icqzXTSNUeLIbHJ1qaoflp4xzppnRLjPThD8hPWa8EVXc518Ie6xUOQg5Pms3lxibibPhThOTMIgOHw/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
 
 Unix 有五种 I/O 模型：
 
@@ -28,11 +35,16 @@ Unix 有五种 I/O 模型：
 
 下图中，recvfrom() 用于接收 Socket 传来的数据，并复制到应用进程的缓冲区 buf 中。这里把 recvfrom() 当成系统调用。
 
+值得注意的是：
+
+- 网络I/O读写操作经过用户缓冲区，Sokcet缓冲区
+- 服务端线程在从调用recvfrom开始到它返回有数据报准备好这段时间是阻塞的，recvfrom返回成功后，线程开始处理数据报
+
 ```c
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
 ```
 
-<div align="center"> <img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/1492928416812_4.png"/> </div><br>
+![图片](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/640-20201227190050226)
 
 <img src="https://raw.githubusercontent.com/scottie1996/PicGo/master/img/image-20201010172305270.png" alt="image-20201010172305270" style="zoom:67%;" />
 
@@ -52,11 +64,44 @@ NIO中的N可以理解为Non-blocking，不单纯是New。它支持面向缓冲�
 
 ### BIO与NIO的区别
 
+**解决数据多次拷贝**
+
+标准I/O处理，完成一次完整的数据读写，至少需要`从底层硬件读到内核空间，再读到用户文件，又从用户空间写入内核空间，再写入底层硬件`
+
+此外，底层通过write、read等函数进行I/O系统调用时，需要传入数据所在缓冲区**起始地址和长度**由于JVM GC的存在，导致对象在堆中的位置往往会发生移动，移动后传入系统函数的地址参数就不是真正的缓冲区地址了
+
+可能导致读写出错，为了解决上面的问题，使用标准I/O进行系统调用时，还会额外导致一次数据拷贝：把数据从JVM的堆内拷贝到堆外的连续空间内存(堆外内存)
+
+所以总共经历6次数据拷贝，执行效率较低
+
+![图片](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/640-20201227191159037.png)
+
 **IO流是阻塞的，NIO流是不阻塞的。**
+
+传统的网络I/O处理中，由于请求建立连接(connect)，读取网络I/O数据(read)，发送数据(send)等操作是线程阻塞的
+
+```java
+// 等待连接*
+Socket socket = serverSocket.accept();
+
+*// 连接已建立，读取请求消息*
+StringBuilder req = new StringBuilder();
+byte[] recvByteBuf = newbyte[1024];
+int len;
+while ((len = socket.getInputStream().read(recvByteBuf)) != -1) {
+	req.append(new String(recvByteBuf, 0, len, StandardCharsets.UTF_8));
+}
+
+*// 写入返回消息*
+socket.getOutputStream().write(("server response msg".getBytes()));
+socket.shutdownOutput();
+```
 
 Java NIO使我们可以进行非阻塞IO操作。比如说，单线程中从通道读取数据到buffer，同时可以继续做别的事情，当数据读取到buffer中后，线程再继续处理数据。写数据也是一样的。另外，非阻塞写也是如此。一个线程请求写入一些数据到某通道，但不需要等待它完全写入，这个线程同时可以去做别的事情。
 
 Java IO的各种流是阻塞的。这意味着，当一个线程调用 `read()` 或  `write()` 时，该线程被阻塞，直到有一些数据被读取，或数据完全写入。该线程在此期间不能再干任何事情了
+
+**Java NIO核心三大核心组件是Buffer(缓冲区)、Channel(通道)、Selector**
 
 #### Buffer(缓冲区)
 
@@ -66,27 +111,60 @@ Buffer是一个对象，它包含一些要写入或者要读出的数据。在NI
 
 在NIO厍中，所有数据都是用缓冲区处理的。在读取数据时，它是直接读到缓冲区中的; 在写入数据时，写入到缓冲区中。任何时候访问NIO中的数据，都是通过缓冲区进行操作。
 
-最常用的缓冲区是 ByteBuffer,一个 ByteBuffer 提供了一组功能用于操作 byte 数组。除了ByteBuffer,还有其他的一些缓冲区，事实上，每一种Java基本类型（除了Boolean类型）都对应有一种缓冲区。
+最常用的缓冲区是 ByteBuffer,一个 ByteBuffer 提供了一组功能用于操作 byte 数组。除了ByteBuffer,还有其他的一些缓冲区，事实上，每一种Java基本类型（除了Boolean类型）都对应有一种缓冲区。Buffer底层支持Java堆外内存和堆内内存
+
+**堆外内存**是指与堆内存相对应的，把内存对象分配在JVM堆以外的内存，这些内存直接受操作系统管理（而不是虚拟机，相比堆内内存，I/O操作中使用堆外内存的优势在于：
+
+- 不用被JVM GC线回收，减少GC线程资源占有
+- 在I/O系统调用时，直接操作堆外内存，可以节省一次堆外内存和堆内内存的复制
+
+Buffer可以见到理解为一组基本数据类型，存储地址连续的的数组，支持读写操作，对应读模式和写模式，通过几个变量来保存这个数据的当前位置状态：capacity、 position、 limit：
+
+- capacity 缓冲区数组的总长度
+
+- position 下一个要操作的数据元素的位置
+
+- limit 缓冲区数组中不可操作的下一个元素的位置：limit <= capacity
+
+  ![图片](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/640-20201227193149836.png)
 
 #### Channel (通道)
 
-NIO 通过Channel（通道） 进行读写。
+Channel(通道)的概念可以类比I/O流对象，NIO中I/O操作主要基于Channel：从Channel进行数据读取 ：创建一个缓冲区，然后请求Channel读取数据 从Channel进行数据写入 ：创建一个缓冲区，填充数据，请求Channel写入数据
 
-通道是双向的，可读也可写，而流的读写是单向的。无论读写，通道只能和Buffer交互。因为 Buffer，通道可以异步地读写。
+Channel和流非常相似，主要有以下几点区别：
+
+- Channel可以读和写，而标准I/O流是单向的
+- Channel可以异步读写，标准I/O流需要线程阻塞等待直到读写操作完成
+- Channel总是基于缓冲区Buffer读写
+
+Java NIO中最重要的几个Channel的实现：
+
+- FileChannel：用于文件的数据读写，基于FileChannel提供的方法能减少读写文件数据拷贝次数，后面会介绍
+- DatagramChannel：用于UDP的数据读写
+- SocketChannel：用于TCP的数据读写，代表客户端连接
+- ServerSocketChannel: 监听TCP连接请求，每个请求会创建会一个SocketChannel，一般用于服务端
 
 #### Selectors(选择器)
 
 NIO有选择器，而IO没有。
 
+Selector(选择器) ，它是Java NIO核心组件中的一个，用于检查一个或多个NIO Channel（通道）的状态是否处于可读、可写。实现单线程管理多个Channel，也就是可以管理多个网络连接
+
 选择器用于使用单个线程处理多个通道。因此，它需要较少的线程来处理这些通道。线程之间的切换对于操作系统来说是昂贵的。 因此，为了提高系统效率选择器是有用的。
 
-![一个单线程中Slector维护3个Channel的示意图](https://user-gold-cdn.xitu.io/2019/9/20/16d4c8bb26a5ad33?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+![图片](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/640-20201227202522780.png)
 
+Selector核心在于基于操作系统提供的I/O复用功能，单个线程可以同时监视多个连接描述符，一旦某个连接就绪（一般是读就绪或者写就绪），能够通知程序进行相应的读写操作，常见有select、poll、epoll等不同实现
 
+Java NIO Selector基本工作原理如下：
 
-
-
-
+- (1) 初始化Selector对象，服务端ServerSocketChannel对象
+- (2) 向Selector注册ServerSocketChannel的socket-accept事件
+- (3) 线程阻塞于selector.select()，当有客户端请求服务端，线程退出阻塞
+- (4) 基于selector获取所有就绪事件，此时先获取到socket-accept事件，向Selector注册客户端SocketChannel的数据就绪可读事件事件
+- (5) 线程再次阻塞于selector.select()，当有客户端连接数据就绪，可读
+- (6) 基于ByteBuffer读取客户端请求数据，然后写入响应数据，关闭channel
 
 ## I/O 复用
 

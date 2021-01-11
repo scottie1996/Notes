@@ -700,6 +700,8 @@ HTTPS 并不是新协议，而是让 HTTP 先和 SSL（Secure Sockets Layer）�
 
 <div align="center"> <img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/ssl-offloading.jpg" width="700"/> </div><br>
 
+![img](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/https-intro.png)
+
 ## 加密
 
 ### 1. 对称密钥加密

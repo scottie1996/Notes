@@ -1,0 +1,5 @@
+### 什么是AQS
+
+aqs全称为`AbstractQueuedSynchronizer`，它提供了一个FIFO队列，可以看成是一个用来实现同步锁以及其他涉及到同步功能的核心组件，常见的有:ReentrantLock、CountDownLatch等。
+AQS是一个抽象类，主要是通过继承的方式来使用，它本身没有实现任何的同步接口，仅仅是定义了同步状态的获取以及释放的方法来提供自定义的同步组件。Java并发包很多的同步工具类底层都是基于AQS来实现的，比如我们工作中经常用的Lock工具ReentrantLock、栅栏CountDownLatch、信号量Semaphore等
+

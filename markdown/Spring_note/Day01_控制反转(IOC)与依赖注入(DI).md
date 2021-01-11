@@ -8,6 +8,12 @@
 
 - 解耦：降低程序间的依赖关系，实际开发中应做到**编译期间不依赖，运行时才依赖**。
 
+- 解耦的思路: 使用反射来创建对象,而避免使用new关键字,并通过读取配置文件来获取要创建的对象全限定类名.
+
+  
+
+  ### 解耦实例1: JDBC驱动注册
+
   ```java
   public class JdbcDemo1 {
       public static void main(String[] args) throws  Exception{
@@ -37,23 +43,53 @@
   }
   ```
 
-- 在注册驱动时，如果没有在pom里加上依赖，使用*DriverManager.registerDriver(new com.mysql.jdbc.Driver());*的形式，在编译时就会产生error，因为寻找不到相应的jar包，这时耦合性就是比较高的(编译期间有依赖)
+- 在注册驱动时，如果没有在pom里加上依赖，使用*DriverManager.registerDriver(new com.mysql.jdbc.Driver());*的形式，在**编译**时就会产生error，因为寻找不到相应的jar包，这时耦合性就是比较高的(**编译期间有依赖**)
 
-- 使用反射方法*Class.forName("com.mysql.cj.jdbc.Driver");*这句话中Driver不是*以一个类的形式存在而是以一个字符串的形式*，所以不会出现编译时异常，但若此时没有加入mysql的jar包依赖就会报运行时异常，因为找不到Driver这个类(运行时才有依赖)。
+- 使用反射方法`Class.forName("com.mysql.cj.jdbc.Driver");`这句话中**Driver不是以一个类的形式存在而是以一个字符串的形式**，所以不会出现编译时异常，但若此时没有加入mysql的jar包依赖就会报运行时异常，因为找不到Driver这个类(**运行时才有依赖)**。
 
-### 解耦的思路：
+- 至于为什么可以使用这种方式，查看一下`com.mysql.jdbc.Driver`类的源码如下,在类加载和初始化时,会执行static代码块中的部分,也就是说**加载类的时候就自动注册驱动了**,即使驱动类不存在,在编译时也不会报错,解决了`编译器依赖`.
 
-1. 第一步：使用反射来创建对象，而避免使用new关键字
+- ```java
+  public class Driver extends NonRegisteringDriver implements java.sql.Driver {
+  
+  	static {
+  	    try {
+  	        java.sql.DriverManager.registerDriver(new Driver());	// 类初始化时执行注册动作
+  	    } catch (SQLException E) {
+  	        throw new RuntimeException("Can't register driver!");
+  	    }
+  	}
+  	
+  	public Driver() throws SQLException {
+  	// Required for Class.forName().newInstance()
+  	}
+  
+  }
+  ```
 
-   **区别**：new依赖一个**具体的驱动类**，而反射则**依赖一个字符串**。
+  ### 解耦实例2: UI层,Service层,Dao层的调用
 
-   DriverManager.registerDriver(new com.mysql.cj.jdbc.Driver());
+  在Web项目中,`UI层`,`Service层`,`Dao层`之间有着前后调用的关系.
 
-   Class.forName("com.mysql.cj.jdbc.Driver");
+  ```java
+  public class MyServiceImpl implements IMyService {
+  
+      private IMyDao myDao = new MyDaoImpl();	// 业务层要调用持久层的接口和实现类
+  
+      public void myService(){
+          myDao.serviceProcess();
+      }
+  }
+  
+  ```
 
-   但是，如果把这个字符串限制死，那么只能获取mysql的驱动，显然不太合适，所以
+业务层`依赖`持久层`的接口和实现类,若编译时不存在没有持久层实现类,则编译将不能通过,这构成了`编译期依赖
 
-2. 第二步：通过读取配置文件来获取要创建的对象全限定类名
+
+
+
+
+
 
 ## 工厂模式解耦
 
@@ -77,13 +113,13 @@
 
 ### 读取properties文件
 
-*Properites props  = new Properties();*获取properites文件的流对象
+`Properites props  = new Properties()`;获取properites文件的流对象
 
-*InputStream in = new FileInputStream()；*这里**不要用FileInputStream**，因为不知道里面的路径参数该如何填写，项目发布后src的相对路径都不存在了，绝对路径又不能保证有C盘D盘，所以用**类加载器**完成
+`InputStream in = new FileInputStream()；`这里**不要用FileInputStream**，因为不知道里面的路径参数该如何填写，项目发布后src的相对路径都不存在了，绝对路径又不能保证有C盘D盘，所以用**类加载器**完成
 
-*InputStream in = BeanFactory.class.getClassLoader().getResourceAsStream(bean.properties);*
+`InputStream in = BeanFactory.class.getClassLoader().getResourceAsStream(bean.properties);`
 
-*props.load(in)；*
+`props.load(in)；`
 
 ```java
 public class BeanFactory {
@@ -173,6 +209,139 @@ public class BeanFactory {
 海尔公司作为一个电器制商需要把自己的商品分销到全国各地，但是发现，不同的分销渠道有不同的玩法，于是派出了各种销售代表玩不同的玩法，随着渠道越来越多，发现，每增加一个渠道就要新增一批人和一个新的流程，严重耦合并依赖各渠道商的玩法。实在受不了了，于是制定业务标准，开发分销信息化系统，只有符合这个标准的渠道商才能成为海尔的分销商。让各个渠道商反过来依赖自己标准。反转了控制，倒置了依赖。
 
 我们把海尔和分销商当作软件对象，分销信息化系统当作IOC容器，可以发现，在没有IOC容器之前，分销商就像图1中的齿轮一样，增加一个齿轮就要增加多种依赖在其他齿轮上，势必导致系统越来越复杂。开发分销系统之后，所有分销商只依赖分销系统，就像图2显示那样，可以很方便的增加和删除齿轮上去。
+
+## 使用springIOC解决程序耦合
+
+### 解耦的思路：
+
+1. 第一步：使用反射来创建对象，而避免使用new关键字
+
+   **区别**：new依赖一个**具体的驱动类**，而反射则**依赖一个字符串**。
+
+   DriverManager.registerDriver(new com.mysql.cj.jdbc.Driver());
+
+   Class.forName("com.mysql.cj.jdbc.Driver");
+
+   但是，如果把这个字符串限制死，那么只能获取mysql的驱动，显然不太合适，所以
+
+2. 第二步：通过读取配置文件来获取要创建的对象全限定类名
+
+## 简单实例
+
+1. 准备工作: 创建MAVEN项目,并准备三层接口类和实现类
+   创建maven项目,配置其`pom.xml`如下:
+
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <project xmlns="http://maven.apache.org/POM/4.0.0"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+       <modelVersion>4.0.0</modelVersion>
+   
+       <groupId>cn.maoritian</groupId>
+       <artifactId>learnspring</artifactId>
+       <version>1.0-SNAPSHOT</version>
+       
+       <dependencies>
+       	<!-- 引入-->
+           <dependency>
+               <groupId>org.springframework</groupId>
+               <artifactId>spring-context</artifactId>
+               <version>5.0.2.RELEASE</version>
+           </dependency>
+       </dependencies>
+   
+   </project>
+   ```
+
+   创建三层接口类和实现类的结构如下,模拟一个保存账户的服务.
+
+   ![在这里插入图片描述](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/watermark%252Ctype_ZmFuZ3poZW5naGVpdGk%252Cshadow_10%252Ctext_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L25jZXB1X0NoZW4%253D%252Csize_16%252Ccolor_FFFFFF%252Ct_70.png)
+
+2. 配置`bean`: 在类的根路径下的`resource`目录下创建`bean.xml`文件,**把对象的创建交给spring来管理.**
+   每个`<bean>`标签对应一个类,其`class`属性为该类的全类名,`id`属性为该类的id,在spring配置中,通过`id`获取类的对象.
+
+   ~~~xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <beans xmlns="http://www.springframework.org/schema/beans"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://www.springframework.org/schema/beans
+            http://www.springframework.org/schema/beans/spring-beans.xsd">
+   
+   ```
+    <!--把对象的创建交给spring来管理-->
+    <bean id="accountService" class="com.itheima.service.impl.AccountServiceImpl"></bean>
+    <bean id="accountDao" class="com.itheima.dao.impl.AccountDaoImpl"></bean>
+   ```
+   
+    </beans>
+   ~~~
+
+3. 在表现层文件`Client.java`中通过`容器`创建对象.通过核心容器的`getBean()`方法获取具体对象.
+
+   ~~~java
+   public class Client {
+        public static void main(String[] args) {
+            // 获取核心容器对象
+            ApplicationContext ac = new ClassPathXmlApplicationContext("bean.xml");
+            // 根据id获取Bean对象
+            IAccountService as  = (IAccountService)ac.getBean("accountService");
+            
+   
+   ```
+        // 执行as的具体方法
+        // ...
+    }
+   ```
+   
+    }
+   ~~~
+
+   
+
+我们常用的`容器`有三种: `ClassPathXmlApplicationContext`,`FileSystemXmlApplicationContext`,`AnnotationConfigApplicationContext`.
+
+- `ClassPathXmlApplicationContext`: 它是从类的根路径下加载配置文件
+- `FileSystemXmlApplicationContext`: 它是从磁盘路径上加载配置文件
+- `AnnotationConfigApplicationContext`: 读取注解创建容器
+
+![在这里插入图片描述](https://raw.githubusercontent.com/scottie1996/PicGo/master/img/watermark%252Ctype_ZmFuZ3poZW5naGVpdGk%252Cshadow_10%252Ctext_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L25jZXB1X0NoZW4%253D%252Csize_16%252Ccolor_FFFFFF%252Ct_70-20210104232323370.png)
+
+
+
+## 使用XML配置文件实现IOC
+
+使用配置文件实现IOC,要将托管给spring的类写进`bean.xml`配置文件中.
+
+### bean标签
+
+- 作用: 配置托管给spring的对象,默认情况下调用类的无参构造函数,若果没有无参构造函数则不能创建成功
+- 属性:
+  1. `id`: 指定对象在容器中的标识,将其作为参数传入`getBean()`方法可以获取获取对应对象.
+  2. `class`: 指定类的全类名,默认情况下调用无参构造函数
+  3. scope: 指定对象的作用范围,可选值如下
+     - `singleton`: 单例对象,默认值
+     - `prototype`: 多例对象
+     - `request`: 将对象存入到web项目的`request域`中
+     - `session`: 将对象存入到web项目的`session域`中
+     - `global session`: 将对象存入到web项目集群的`session域`中,若不存在集群,则`global session`相当于`session`
+  4. `init-method`：指定类中的初始化方法名称,在对象创建成功之后执行
+  5. `destroy-method`：指定类中销毁方法名称,对`prototype`多例对象没有作用,因为多利对象的销毁时机不受`容器`控制
+
+### bean的作用范围和生命周期
+
+1. 单例对象:scope="singleton"
+   - 作用范围: 每个应用只有一个该对象的实例,它的作用范围就是整个应用
+   - 生命周期: 单例对象的创建与销毁 和 容器的创建与销毁时机一致
+     - 对象出生: 当应用加载,创建容器时,对象就被创建
+     - 对象活着: 只要容器存在,对象一直活着
+     - 对象死亡: 当应用卸载,销毁容器时,对象就被销毁
+2. 多例对象:scope="prototype"
+   - 作用范围: 每次访问对象时,都会重新创建对象实例.
+   - 生命周期: 多例对象的创建与销毁时机不受容器控制
+     - 对象出生: 当使用对象时,创建新的对象实例
+     - 对象活着: 只要对象在使用中,就一直活着
+     - 对象死亡: 当对象长时间不用时,被 java 的垃圾回收器回收了
 
 
 

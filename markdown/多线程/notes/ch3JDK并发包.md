@@ -6,7 +6,57 @@
 
 ### 3.1　多线程的团队协作：同步控制	70
 
-#### 3.1.1　synchronized的功能扩展：重入锁	71
+#### Lock API
+
+Lock是一个接口，方法定义如下
+
+```java
+void lock() // 如果锁可用就获得锁，如果锁不可用就阻塞直到锁释放
+void lockInterruptibly() // 和 lock()方法相似, 但阻塞的线程可中断，抛出 java.lang.InterruptedException异常
+boolean tryLock() // 非阻塞获取锁;尝试获取锁，如果成功返回true
+boolean tryLock(long timeout, TimeUnit timeUnit) //带有超时时间的获取锁方法
+void unlock() // 释放锁
+```
+
+##### Lock的实现
+
+实现Lock接口的类有很多，以下为几个常见的锁实现
+
+- ReentrantLock：表示重入锁，它是唯一一个实现了Lock接口的类。重入锁指的是线程在获得锁之后，再次获取该锁不需要阻塞，而是直接关联一次计数器增加重入次数
+- ReentrantReadWriteLock：重入读写锁，它实现了ReadWriteLock接口，在这个类中维护了两个锁，一个是ReadLock，一个是WriteLock，他们都分别实现了Lock接口。读写锁是一种适合读多写少的场景下解决线程安全问题的工具，基本原则是：`读和读不互斥、读和写互斥、写和写互斥`。也就是说涉及到影响数据变化的操作都会存在互斥。
+- StampedLock： stampedLock是JDK8引入的新的锁机制，可以简单认为是读写锁的一个改进版本，读写锁虽然通过分离读和写的功能使得读和读之间可以完全并发，但是读和写是有冲突的，如果大量的读线程存在，可能会引起写线程的饥饿。stampedLock是一种乐观的读策略，使得乐观锁完全不会阻塞写线程
+
+##### ReentrantLock的简单实用
+
+如何在实际应用中使用ReentrantLock呢？我们通过一个简单的demo来演示一下
+
+```java
+public class Demo {
+    private static int count=0;
+    static Lock lock=new ReentrantLock();
+    public static void inc(){
+        lock.lock();
+        try {
+            Thread.sleep(1);
+            count++;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }finally{
+            lock.unlock();
+        }
+    }
+```
+
+这段代码主要做一件事，就是通过一个静态的`incr()`方法对共享变量`count`做连续递增，在没有加同步锁的情况下多线程访问这个方法一定会存在线程安全问题。所以用到了`ReentrantLock`来实现同步锁，并且在finally语句块中释放锁。
+**那么我来引出一个问题，大家思考一下**
+
+> 多个线程通过lock竞争锁时，当竞争失败的锁是如何实现等待以及被唤醒的呢?
+
+
+
+
+
+#### 3.1.1　synchronized的功能扩展：重入锁`ReentrantLock`	71
 
 - `ReentrantLock`是`java.util.concurrent.locks.ReentrantLock`下面的包，`ReentrantLock `实现了 `Lock `接口，`ReentrantLock` 只是 `Lock `接口的一个实现而已。它们都是` java.util.concurrent `包里面的内容（俗称 JUC、并发包），也都是 JDK 1.5 开始加入的。
 
